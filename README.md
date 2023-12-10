@@ -10,15 +10,9 @@ Follow the steps below to create a web map of United States congressional distri
 
 You will need an account on Mapbox.com. Then follow the commands below from the Mac OS X or Ubuntu terminal.
 
-Why use [Tippecanoe](https://github.com/mapbox/tippecanoe)? Using Tippecanoe provides more control over how the geometries are tiled into a map. For comparison, using the Mapbox Studio default upload will not show a zoomed-out full country view of the data because the boundaries are so detailed; the default upload thinks you are only interested in looking closer at the data. Tippecanoe stops  oversimplification of the geometry and also specifies a min/max zoom level.
+[Tippecanoe](https://github.com/felt/tippecanoe) (2.17+) compiles the geospatial boundaries into a mbtiles file for efficiently serving vector tiles at various zoom levels.
 
 #### Dependencies:
-
-On OS X, install required dependencies with Homebrew:
-
-```
-brew install tippecanoe gdal node
-```
 
 On Ubuntu, you'll need node:
 
@@ -31,9 +25,9 @@ and gdal and Tippecanoe, which must be built from sources:
 
 ```
 sudo apt-get install gdal-bin libprotobuf-dev protobuf-compiler libsqlite3-dev
-git clone https://github.com/mapbox/tippecanoe
+git clone https://github.com/felt/tippecanoe
 cd tippecanoe
-make
+make -j
 cd ..
 ```
 
@@ -105,8 +99,9 @@ With this web map, you can show specific congressional districts using the URL h
 
 See the click handler for an example of how to use the Mapbox API to get the congressional district at a particular lat/lng coordinate.
 
-#### Examples:
+## Testing
 
-To show districts in the state of Virginia: http://www.aarondennis.org/congress-maps/example/#state=VA
-
-To show the 5th district of California: http://www.aarondennis.org/congress-maps/example/#state=CA&district=05
+```sh
+npm install -g http-server
+http-server . --cors
+```
