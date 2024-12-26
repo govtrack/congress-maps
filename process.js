@@ -18,20 +18,33 @@ function ordinal(number) {
   return number + suffixes[number % 10];
 }
 
-// Load and re-format the congressional district data.
-var census_boundaries = 
-  JSON.parse(fs.readFileSync("data/congressional_districts.geojson", 'utf8'))
-  .features
+// Load the GeoJSON files.
+var census_boundaries = process.argv.slice(2)
+  .map(fn => {
+    return JSON.parse(fs.readFileSync(fn, 'utf8'))
+      .features;
+  }).flat();
+
+// Re-style GeoJSON features.
+census_boundaries = census_boundaries
+  .filter(function(d) {
+    // Some states have district 'ZZ' which represents the area of
+    // a state, usually over water, that is not included in any
+    // congressional district --- filter these out.
+    if (d.properties['CD119FP'] == 'ZZ')
+      return false;
+    return true;
+  })
   .map(function(item) {
     // Get state from FIPS code.
-    let stateinfo = stateFipsCodesMap[parseInt(item.properties.state)];
+    let stateinfo = stateFipsCodesMap[parseInt(item.properties.STATEFP)];
     stateinfo.seen = true; // did we get boundaries for every state?
 
     // Get the district number in two-digit form: "00" for at-large
     // districts, "01", "02", .... The Census data's CD___FP field
     // holds it in this format, except for the island territories
     // which have "98", but are just at-large and should be "00".
-    let district_number = item.properties.CD118;
+    let district_number = item.properties.CD119FP;
     if (district_number == "98") district_number = "00";
     if (district_number == "AL") district_number = "00"; // American Redistricting Project
 
@@ -46,38 +59,6 @@ var census_boundaries =
       },
       "geometry": item.geometry
     };
-  });
-
-// Fill in the territories that weren't present in the ARP data.
-JSON.parse(fs.readFileSync("data/congressional_districts_116.geojson", 'utf8'))
-  .features
-  .filter(function(d) {
-    // Some states have district 'ZZ' which represents the area of
-    // a state, usually over water, that is not included in any
-    // congressional district --- filter these out.
-    if (d.properties['CD116FP'] == 'ZZ')
-      return false;
-    return true;
-  })
-  .forEach(item => {
-    // Skip states we've already seen.
-    let stateinfo = stateFipsCodesMap[parseInt(item.properties.STATEFP)];
-    if (stateinfo.seen) return;
-
-    // The territories all have at-large delegates.
-    district_number = "00";
-
-    census_boundaries.push({
-      "type": "Feature",
-      "properties": {
-        state: stateinfo.USPS,
-        state_name: stateinfo.Name,
-        number: district_number,
-        title_short: stateinfo.USPS + ' ' + (district_number == "00" ? "At Large" : parseInt(district_number)),
-        title_long: stateinfo.Name + '’s ' + (district_number == "00" ? "At Large" : ordinal(parseInt(district_number))) + ' Congressional District',
-      },
-      "geometry": item.geometry
-    });
   });
 
 // Build a new FeatureCollection that we can pass into fiveColorMap.

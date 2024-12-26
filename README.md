@@ -1,10 +1,10 @@
 # Mapping US Congressional Districts
 
-These instructions create maps for the 118th Congress using district boundaries as of the 2022 elections.)
+These instructions create maps for the 119th Congress using district boundaries as of the 2024 elections.)
 
-NOTE: Typically we use Census Bureau data but to get ahead of the game for the 118th Congress, since Census data is not yet published for the new districts, these instructions use congressional district geospatial data collected by the [American Redistricting Project](https://thearp.org/blog/map-archive/) as combined into a single file by [Glenn Rice](https://acsdatacommunity.prb.org/discussion-forum/f/forum/977/shapefiles-for-118th-cds-current-slds) on June 8, 2022. ARP doesn't include boundaries for DC and the island territories, so they are added from the Census's most recent congressional district shapefiles.
+Follow the steps below to create a web map of United States congressional districts from [Census Bureau geospatial data](https://www.census.gov/programs-surveys/geography/technical-documentation/user-note/cd-sld-note.html). This year we are using Census Bureau data, but some years we use [American Redistricting Project](https://thearp.org/blog/map-archive/) shapefiles when Census data is out of date.
 
----
+We use Mapbox to render the web map. You can also use this to create a lat/lng-to-congressional district API using the Mapbox API. You will need an account on Mapbox.com.
 
 Follow the steps below to create a web map of United States congressional districts from [Census Bureau geospatial data](https://www.census.gov/programs-surveys/geography/technical-documentation/user-note/cd-sld-note.html) using Mapbox to render the web map. You can also use this to create a lat/lng-to-congressional district API using the Mapbox API.
 
@@ -14,30 +14,27 @@ You will need an account on Mapbox.com. Then follow the commands below from the 
 
 #### Dependencies:
 
-On Ubuntu, you'll need node:
-
-```
-curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.31.0/install.sh | bash
-nvm install 5.0
-```
-
-and gdal and Tippecanoe, which must be built from sources:
-
-```
-sudo apt-get install gdal-bin libprotobuf-dev protobuf-compiler libsqlite3-dev
-git clone https://github.com/felt/tippecanoe
-cd tippecanoe
-make -j
-cd ..
-```
-
-#### Setup:
-
-Download this repository and then use `npm` to install a few more dependencies:
+On Ubuntu, you'll need node, GDAL, Tippecanoe, and this project's dependencies:
 
 ```
 git clone https://github.com/govtrack/congress-maps.git
 cd congress-maps
+
+# node
+curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.31.0/install.sh | bash
+nvm install stable
+
+# GLAD
+sudo apt install gdal-bin
+
+# Tippecanoe
+sudo apt install libprotobuf-dev protobuf-compiler libsqlite3-dev
+git clone https://github.com/felt/tippecanoe # or download a release ZIP
+cd tippecanoe
+make -j
+cd ..
+
+# this repository's dependencies
 npm install
 ```
 
@@ -50,22 +47,20 @@ To complete these steps, run the commands below.
 mkdir data
 
 # dowload district boundary data, unzip the data, and convert it to GeoJSON
-wget -P data ftp://ftp2.census.gov/geo/tiger/TIGER2022/CD/tl_2022_us_cd116.zip
-unzip data/tl_2022_us_cd116.zip -d ./data/
-ogr2ogr -f GeoJSON -t_srs crs:84 data/congressional_districts_116.geojson data/tl_2022_us_cd116.shp
-
-wget -P data https://mcdc.missouri.edu/data/georef/leg_districts_2022/USA_CD118.zip
-unzip data/USA_CD118.zip -d ./data/
-ogr2ogr -f GeoJSON -t_srs crs:84 data/congressional_districts.geojson data/USA_CD118.shp
+wget -P data ftp://ftp2.census.gov/geo/tiger/TIGER2024/CD/tl_2024_*_cd119.zip
+for fn in data/*_cd119.zip; do
+	unzip -oq $fn -d ./data/
+	ogr2ogr -f GeoJSON -t_srs crs:84 $(echo $fn | sed s/zip/geojson/) $(echo $fn | sed s/zip/shp/)
+done
 
 # normalize format and add label points, saving to data/map.geojson and data/bboxes.js
-node process.js
+node process.js data/tl_2024*.geojson
 
 # create Mapbox vector tiles from data
 tippecanoe/tippecanoe \
 	-f -Z 0 -z 12 -B0 -pS \
-	-o data/cd-118-2022-arp.mbtiles \
-	--name "118th Congress (2022 Election) Congressional Districts - American Redistricting Project Data" \
+	-o data/cd-119-2024.mbtiles \
+	--name "119th Congress (2024 Election) Congressional Districts" \
 	data/map.geojson
 ```
 
@@ -78,7 +73,7 @@ export MAPBOX_DEFAULT_ACCESS_TOKEN=<your mapbox default access token>
 export MAPBOX_WRITE_SCOPE_ACCESS_TOKEN=<your mapbox write scope access token>
 
 # upload map data to Mapbox.com
-node upload.js data/cd-118-2022-arp.mbtiles "cd-118-2022-arp" "US_Congressional_Districts_118th_Congress_2022_Election_ARP"
+node upload.js data/cd-119-2024.mbtiles "cd-119-2024" "US_Congressional_Districts_119th_Congress_2024_Election"
 ```
 
 Check out [mapbox.com/studio](https://www.mapbox.com/studio) to see updates on data processing. Once Mapbox is finished processing your upload, you can make a map style. Click New Style. Choose a template --- I last tried Navigation - Day, which seemed nice. Then create layers:
