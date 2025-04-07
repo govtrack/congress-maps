@@ -122,6 +122,9 @@ districts.features.forEach(function(d) {
   pt.properties.group = 'label';
   d.properties.group = 'boundary';
 
+  // add the area to the point to control zoom level steps for label styling
+  pt.properties.area = turf.area(d);
+
   // add both the label point and congressional district to the mapData feature collection
   mapData.features.push(pt);
   mapData.features.push(d);

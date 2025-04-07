@@ -1,18 +1,12 @@
 # Mapping US Congressional Districts
 
-These instructions create maps for the 119th Congress using district boundaries as of the 2024 elections.)
+These instructions create maps for the 119th Congress using district boundaries as of the 2024 elections. An example UI using maplibre-gl is in the `example` directory, and a Python lat/lng-to-district function is included.
 
 Follow the steps below to create a web map of United States congressional districts from [Census Bureau geospatial data](https://www.census.gov/programs-surveys/geography/technical-documentation/user-note/cd-sld-note.html). This year we are using Census Bureau data, but some years we use [American Redistricting Project](https://thearp.org/blog/map-archive/) shapefiles when Census data is out of date.
 
-We use Mapbox to render the web map. You can also use this to create a lat/lng-to-congressional district API using the Mapbox API. You will need an account on Mapbox.com.
+[Tippecanoe](https://github.com/felt/tippecanoe) (2.17+) compiles the geospatial boundaries into a pmtiles file for efficiently serving vector tiles at various zoom levels.
 
-Follow the steps below to create a web map of United States congressional districts from [Census Bureau geospatial data](https://www.census.gov/programs-surveys/geography/technical-documentation/user-note/cd-sld-note.html) using Mapbox to render the web map. You can also use this to create a lat/lng-to-congressional district API using the Mapbox API.
-
-You will need an account on Mapbox.com. Then follow the commands below from the Mac OS X or Ubuntu terminal.
-
-[Tippecanoe](https://github.com/felt/tippecanoe) (2.17+) compiles the geospatial boundaries into a mbtiles file for efficiently serving vector tiles at various zoom levels.
-
-#### Dependencies:
+## Dependencies
 
 On Ubuntu, you'll need node, GDAL, Tippecanoe, and this project's dependencies:
 
@@ -38,7 +32,7 @@ cd ..
 npm install
 ```
 
-#### Creating the map:
+## Generating the GeoJSON and PMTiles files
 
 To complete these steps, run the commands below.
 
@@ -56,47 +50,31 @@ done
 # normalize format and add label points, saving to data/map.geojson and data/bboxes.js
 node process.js data/tl_2024*.geojson
 
-# create Mapbox vector tiles from data
+# create vector tile cache from data
 tippecanoe/tippecanoe \
 	-f -Z 0 -z 12 -B0 -pS \
-	-o data/cd-119-2024.mbtiles \
+	-l layer -o data/cd-119-2024.pmtiles \
 	--name "119th Congress (2024 Election) Congressional Districts" \
 	data/map.geojson
 ```
 
-For the last step to upload the map boundaries to Mapbox, set `MAPBOX_USERNAME` to your Mapbox username, `MAPBOX_DEFAULT_ACCESS_TOKEN` to your Mapbox default public token, and `MAPBOX_ACESS_TOKEN` to a `uploads:write` scope access token from your [Mapbox account](https://www.mapbox.com/studio/account/tokens).
+## Extracting a United States baselayer
 
-```sh
-# setup Mapbox account name, default public token, and write-scoped token
-export MAPBOX_USERNAME=<your mapbox username>
-export MAPBOX_DEFAULT_ACCESS_TOKEN=<your mapbox default access token>
-export MAPBOX_WRITE_SCOPE_ACCESS_TOKEN=<your mapbox write scope access token>
+Download go-pmtiles https://github.com/protomaps/go-pmtiles/releases and select a Protomaps baselayer from https://maps.protomaps.com/builds/:
 
-# upload map data to Mapbox.com
-node upload.js data/cd-119-2024.mbtiles "cd-119-2024" "US_Congressional_Districts_119th_Congress_2024_Election"
+```
+go-pmtiles_*/pmtiles extract https://build.protomaps.com/20250407.pmtiles example/baselayer.pmtiles --maxzoom=12 --region=united_states_region.geojson
 ```
 
-Check out [mapbox.com/studio](https://www.mapbox.com/studio) to see updates on data processing. Once Mapbox is finished processing your upload, you can make a map style. Click New Style. Choose a template --- I last tried Navigation - Day, which seemed nice. Then create layers:
-
-* Create a new layer and select the uploaded tileset as the source. Change the type to fill. In Style - Color, click Style With Data Conditions. Select color_index as the data value. Select 0, choose a color, click Done. Then click Add Another Condition and repeat for 1 through 4. Click Opacity, Style Across Zoom Range. Click the stop point for zoom 22 and set the opacity to 0 and the zoom level to 15, so that the fills fade out when zoomed into street level. Name the layer CD-Fills. Drag the layer all the way to the bottom of the layers but above "Land & water, land" so that it covers the base color for land but is behind all of the other map features. 
-* Create another layer with the same data named CD-Outlines. Set its type to Line. In Style, click Width, then Style Across Zoom Range. Set the first zoom stop to zoom level 3 and line width 1px. Set the second zoom stop to zoom level 15 and the line width to 4px. Keep this layer at the top.
-* Create another layer named CD-Labels. Set its type to Symbol. Set a filter on `group` to `label`. In Style, click Text Field, style across zoom range. At zoom stop 0, set the text field to the data field title_short. Set the second stop to zoom level 7 and the text field to the data field title_long. I set the font to Montserrat Light 12px at zoom level 0 and Montserrat Bold 16px at zoom level 7. I added 4 px white halo.
-* In the Administrative Boundaries component, I turned off all boundaries.
-* Click Publish.
-
-#### Usage:
-
-Use the files in the `example` directory as the basis for making a web map with functionality to focus on specific states or districts. To use this example web map, you'll need to edit `index.html` and insert your default public access token and the style URL and tileset ID from Mapbox.
-
-After following the steps above, `index.html` will be a full page web map of U.S. Congressional districts. Host this file and the two supporting scripts (`states.js`, `bboxes.js`) on your website. If you don't want the interactive menu on your map, search through `index.html` and remove all sections of code that immediately follow the `INTERACTIVE MENU` line comment labels.
-
-With this web map, you can show specific congressional districts using the URL hash. Set the location hash to `state={state abbreviation}` to show a specific state and add `&district={district number}` to specify a district within the state. The hash expects US Census two letter state abbreviations and district number conventions. At Large districts are numbered `00` and all other districts are two character numbers: `district=01`, `district=02`, ..., `district=15`, etc.
-
-See the click handler for an example of how to use the Mapbox API to get the congressional district at a particular lat/lng coordinate.
+That's enough to run the example.
 
 ## Testing
 
+Start a debug server:
+
 ```sh
-npm install -g http-server
-http-server . --cors
+node_modules/http-server/bin/http-server . --cors
 ```
+
+and visit http://127.0.0.1:8080/example.
+

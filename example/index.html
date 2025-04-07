@@ -1,292 +1,353 @@
-<!DOCTYPE html>
 <html>
-<head>
-    <meta charset='utf-8' />
-    <title>Congressional Districts</title>
+    <head>
+        <title>Congressional Districts MapLibre Example</title>
+        <meta charset="utf-8"/>
 
-    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+        <link rel="stylesheet" href="/node_modules/maplibre-gl/dist/maplibre-gl.css" crossorigin="anonymous">
+        <script src="/node_modules/maplibre-gl/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+        <script src="/node_modules/pmtiles/dist/pmtiles.js"></script>
+        <script src="protomaps-style.jsonp"></script>
 
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+        <script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+        
+        <style>
+            body {
+                margin: 0;
+            }
+            #map {
+                height:100%; width:100%;
+            }
 
-    <!-- Mabpox -->
-    <script src='https://api.mapbox.com/mapbox-gl-js/v2.0.0/mapbox-gl.js'></script>
-    <link href='https://api.mapbox.com/mapbox-gl-js/v2.0.0/mapbox-gl.css' rel='stylesheet' />
+            /* DEMO INTERACTIVE MENU */
+            #menu {
+              position:absolute;
+              top:10px;
+              left:10px;
+              background-color: white;
+              margin-right: 10px;
+              padding: 8px;
+              border-radius: 4px;
+              border: rgb(221, 221, 221);
+              box-shadow: 0px 0px 0px 2px rgb(221, 221, 221);
+              color: #222;
+              font-family: 'Open Sans', Arial, sans-serif;
+            }
+            .selector { display: inline-block; float: left; margin: 4px; }
 
-    <style>
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
 
-        body { margin:0; padding:0; }
-        #map { position:absolute; top:0; bottom:0; width:100%; }
+        <!-- DEMO INTERACTIVE MENU -->
+        <div id='menu'>
+          <div class="selector">
+            State:
+            <select id='state'>
+              <option value=""></option>
+            </select>
+          </div>
+          <div class="selector">
+            District:
+            <select id='district'>
+              <option value=''></option>
+            </select>
+          </div>
+        </div>
 
-        /* INTERACTIVE MENU */
-        #menu {
-          position:absolute;
-          top:10px;
-          left:10px;
-          background-color: white;
-          margin-right: 10px;
-          padding: 8px;
-          border-radius: 4px;
-          border: rgb(221, 221, 221);
-          box-shadow: 0px 0px 0px 2px rgb(221, 221, 221);
-          color: #222;
-          font-family: 'Open Sans', Arial, sans-serif;
-        }
-        .selector { display: inline-block; float: left; margin: 4px; }
+        <!-- Load in some useful data about the states & districts for the demo interactive menu -->
+        <script src='./states.js'></script>
+        <script src='./bboxes.js'></script>
 
-    </style>
-</head>
-<body>
+        <script type="text/javascript">
+            let protocol = new pmtiles.Protocol({/*metadata: true*/});
+            maplibregl.addProtocol("pmtiles", protocol.tile);
 
-<!-- Map Container -->
-<div id='map'></div>
+            const protomaps_layers_base = 11;
 
-<!-- INTERACTIVE MENU -->
-<div id='menu'>
-  <div class="selector">
-    State:
-    <select id='state'>
-      <option value=""></option>
-    </select>
-  </div>
-  <div class="selector">
-    District:
-    <select id='district'>
-      <option value=''></option>
-    </select>
-  </div>
-</div>
+            const map = new maplibregl.Map({
+              container: "map",
+              zoom: 1,
+              center: [-100, 40],
+              style: {
+                version: 8,
 
-<!-- Load in some useful data about the states -->
-<script src='./states.js'></script>
-<script src='./bboxes.js'></script>
+                sources: {
+                  congressional_districts: {
+                    type: "vector",
+                    url: "pmtiles:///data/cd-119-2024.pmtiles",
+                  },
 
-<script>
+                  "protomaps": {
+                      "type": "vector",
+                      "attribution": "<a href=\"https://github.com/protomaps/basemaps\">Protomaps</a> © <a href=\"https://openstreetmap.org\">OpenStreetMap</a>",
+                      "url": "pmtiles://baselayer.pmtiles"
+                  }
 
-//** MODIFY THIS SECTION
-var accessToken = '....';
-var styleURL = 'mapbox://...';
-var tilesetId = 'username.tilesetid'; // used by the click handler only
+                  // Backup OSM baselayer.
+                  /*
+                  "osm": {
+                    "type": "raster",
+                    "tiles": ["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                    "tileSize": 256,
+                    "attribution": "&copy; OpenStreetMap Contributors",
+                    "maxzoom": 19
+                  }*/
+                },
 
-//** INTERACTIVE MENU
-// Create an object to list all the possible districts for a given state or territory
-var stateList = states.map(function(d) { return { name: d.Name, abbr: d.USPS }; });
-var possibleDistricts = {};
-stateList.map(function(d) { possibleDistricts[d.abbr] = [] });
+                //glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
 
-//** INTERACTIVE MENU
-// For each state, add the numbers of its districts
-for (d in bboxes) {
-  possibleDistricts[d.slice(0,2)].push(d.slice(2,d.length));
-}
+                // TODO: Clone these locally?
+                "sprite": "https://protomaps.github.io/basemaps-assets/sprites/v4/light",
+                "glyphs": "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
 
-//** INTERACTIVE MENU
-// Sort in ascending order each state's list of districts
-for (d in possibleDistricts) {
-  possibleDistricts[d].sort(function(a,b) {
-    if (b === "") { return 1 } else { return parseInt(a) - parseInt(b); }
-  });
-  // For states with only one district, make the list of districts only contain an at-large choice
-  if (possibleDistricts[d].length === 2) possibleDistricts[d] = ['00'];
-}
+                layers: 
+                  protomaps_style.layers.slice(0, protomaps_layers_base).concat([
 
-//** INTERACTIVE MENU
-// Add an option to the interactive State menu for each state
-stateList.map(function(d) {
-  $('#state')
-    .append($("<option></option>")
-      .attr('value', d.abbr).text(d.name));
-})
+                  // The backup OSM baselayer but isn't as nice as when we put
+                  // land vector layers behind our fills and roads etc on top 
+                  // of our fills.
+                  /*{
+                    "id": "osm",
+                    "type": "raster",
+                    "source": "osm"
+                  },*/
 
-//** INTERACTIVE MENU
-// Create an event listener that responds to the selection of a state from the menu
-$('#state').change(function() {
-  if (this.value === '') { window.location.hash = '#' }
-  else {
-    var hash = window.location.hash;
-    var newHash = 'state=' + this.value;
-    window.location.hash = newHash;
-  }
-});
+                  {
+                    id: "cdfill",
+                    source: "congressional_districts",
+                    "source-layer": "layer",
+                    type: "fill",
+                    paint: {
+                      "fill-color": [
+                        "case",
+                         ["==", ["get", "color_index"], 0], "hsl(42, 75%, 40%)",
+                         ["==", ["get", "color_index"], 1], "hsl(42, 75%, 45%)",
+                         ["==", ["get", "color_index"], 2], "hsl(42, 75%, 55%)",
+                         ["==", ["get", "color_index"], 3], "hsl(42, 75%, 65%)",
+                         ["==", ["get", "color_index"], 4], "hsl(42, 75%, 75%)",
+                         "hsl(0, 0%, 0%)"
+                      ],
+                      "fill-opacity": ["interpolate",["linear"],["zoom"],4,.8,12,0]
+                    },
+                  }])
+                    // Water, roads, and labels go on top of our fills but below our outlines and labels.
+                    .concat(protomaps_style.layers.slice(protomaps_layers_base))
+                    .concat([
+                  {
+                    id: "cdoutline",
+                    source: "congressional_districts",
+                    "source-layer": "layer",
+                    type: "line",
+                    paint: {
+                      "line-color": "rgb(100, 90, 120)",
+                      "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2, 12, 10],
+                      "line-opacity": ["interpolate", ["linear"], ["zoom"], 4, 0, 8, 1, 12, .25],
+                    },
+                  },
+                  {
+                    id: "cdlabel",
+                    source: "congressional_districts",
+                    "source-layer": "layer",
+                    filter: ["==","group","label"],
+                    type: "symbol",
+                    layout: {
+                        "symbol-placement": "point",
+                        "text-font": [
+                            "Noto Sans Regular"
+                        ],
+                        'text-field': ["step", ["zoom"], 
+                            ['get', 'title_short'],
+                            5, ["step", ["get", "area"], ['get', 'title_short'], 10**11, ['get', 'title_long']],
+                            7, ["step", ["get", "area"], ['get', 'title_short'], 10**10, ['get', 'title_long']],
+                            9, ["step", ["get", "area"], ['get', 'title_short'], 10**9, ['get', 'title_long']],
+                            10, ["step", ["get", "area"], ['get', 'title_short'], 10**8, ['get', 'title_long']],
+                            11, ["step", ["get", "area"], ['get', 'title_short'], 10**7, ['get', 'title_long']],
+                            12, ["step", ["get", "area"], ['get', 'title_short'], 10**6, ['get', 'title_long']],
+                            13, ['get', 'title_long']],
+                        'text-size': ["interpolate", ["linear"], ["zoom"],
+                            4, 16,
+                            15, ["interpolate", ["linear"], ["get", "area"], 10**6, 16, 10**8, 40]],
+                    },
+                    paint: {
+                        'text-color': '#202',
+                        'text-halo-color': '#fff',
+                        'text-halo-width': 3
+                    },
+                  },
+                ])
+              },
+            });
+            //map.showTileBoundaries = true;
 
-//** INTERACTIVE MENU
-// Create an event listener that responds to the selection of a district from the menu
-$('#district').change(function() {
-  var hash = window.location.hash;
-  var currentDistrictIndex = hash.indexOf('&district=');
-  var newHash = currentDistrictIndex >= 0 ?
-    hash.slice(0,currentDistrictIndex) + '&district=' + this.value :
-    hash + '&district=' + this.value ;
-  window.location.hash = newHash;
-});
+            //** DEMO INTERACTIVE MENU
+            // Create an object to list all the possible districts for a given state or territory
+            var stateList = states.map(function(d) { return { name: d.Name, abbr: d.USPS }; });
+            var possibleDistricts = {};
+            stateList.map(function(d) { possibleDistricts[d.abbr] = [] });
+            // For each state, add the numbers of its districts
+            for (d in bboxes) {
+              possibleDistricts[d.slice(0,2)].push(d.slice(2,d.length));
+            }
+            // Sort in ascending order each state's list of districts
+            for (d in possibleDistricts) {
+              possibleDistricts[d].sort(function(a,b) {
+                if (b === "") { return 1 } else { return parseInt(a) - parseInt(b); }
+              });
+              // For states with only one district, make the list of districts only contain an at-large choice
+              if (possibleDistricts[d].length === 2) possibleDistricts[d] = ['00'];
+            }
+            // Add an option to the interactive State menu for each state
+            stateList.map(function(d) {
+              $('#state')
+                .append($("<option></option>")
+                  .attr('value', d.abbr).text(d.name));
+            })
+            // Create an event listener that responds to the selection of a state from the menu
+            $('#state').change(function() {
+              if (this.value === '') { window.location.hash = '#' }
+              else {
+                var hash = window.location.hash;
+                var newHash = 'state=' + this.value;
+                window.location.hash = newHash;
+              }
+            });
+            // Create an event listener that responds to the selection of a district from the menu
+            $('#district').change(function() {
+              var hash = window.location.hash;
+              var currentDistrictIndex = hash.indexOf('&district=');
+              var newHash = currentDistrictIndex >= 0 ?
+                hash.slice(0,currentDistrictIndex) + '&district=' + this.value :
+                hash + '&district=' + this.value ;
+              window.location.hash = newHash;
+            });
+            // Once map is fully loaded...
+            map.on('load', function() {
+              function lngLatBoundsToCameraOptions(bounds) {
+                var w = $('#map').width();
+                var h = $('#map').height();
+                return {
+                  center: bounds.getCenter(),
+                  zoom: Math.log(((w*h) / ((bounds.getNorth()-bounds.getSouth()) * (bounds.getEast() - bounds.getWest())))) / 1.75
+                };
+              }
 
-  // Initialize the map
-  mapboxgl.accessToken = accessToken;
-  var contiguous_united_states = mapboxgl.LngLatBounds.convert([[-128.8, 23.6], [-65.4, 50.2]]);
-  var camera = lngLatBoundsToCameraOptions(contiguous_united_states);
-  var map = new mapboxgl.Map({
-    container: 'map',
-    style: styleURL,
-    center: camera.center,
-    zoom: camera.zoom
-    });
+              // Given a state postal abbreviation and a US Census district number, focus the map on that area
+              function focusMap(stateAbbr, districtCode) {
+                //** INTERACTIVE MENU
+                // Set the interactive menu to focus on the state and district code, if provided
+                $('#state').val(stateAbbr);
+                $('#district').empty();
+                possibleDistricts[stateAbbr].map(function(d) {
+                  $('#district')
+                    .append($("<option></option>")
+                      .attr('value', d).text(d));
+                });
+                if (districtCode) $('#district').val(districtCode);
 
-  function lngLatBoundsToCameraOptions(bounds) {
-    var w = $('#map').width();
-    var h = $('#map').height();
-    return {
-      center: bounds.getCenter(),
-      zoom: Math.log(((w*h) / ((bounds.getNorth()-bounds.getSouth()) * (bounds.getEast() - bounds.getWest())))) / 1.75
-    };
-  }
-  // Once map is fully loaded...
-  map.on('load', function() {
-    // Add zoom and rotation controls to the map
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+                var filter = ['all'];
+                if (stateAbbr) filter.push(['==', 'state', stateAbbr]);
+                if (districtCode) filter.push(['==', 'number', districtCode]);
+                map.setFilter("cdfill", filter);
+                map.setFilter("cdoutline", filter);
+                map.setFilter("cdlabel", filter);
 
-    // Disable using touch gestures for map rotation
-    map.touchZoomRotate.disableRotation();
+                // Ease to that district.
+                var bbox = bboxes[stateAbbr + (districtCode ? districtCode : '')];
+                map.easeTo(lngLatBoundsToCameraOptions(maplibregl.LngLatBounds.convert(bbox)));
+              }
 
-    // Given a state postal abbreviation and a US Census district number, focus the map on that area
-    function focusMap(stateAbbr, districtCode) {
-      //** INTERACTIVE MENU
-      // Set the interactive menu to focus on the state and district code, if provided
-      $('#state').val(stateAbbr);
-      $('#district').empty();
-      possibleDistricts[stateAbbr].map(function(d) {
-        $('#district')
-          .append($("<option></option>")
-            .attr('value', d).text(d));
-      });
-      if (districtCode) $('#district').val(districtCode);
+              // Check the URL hash to determine how the map should be focused
+              function checkHash() {
+                // If a URL hash is found...
+                if(window.location.hash) {
 
-      var filter = ['all'];
-      if (stateAbbr) filter.push(['==', 'state', stateAbbr]);
-      if (districtCode) filter.push(['==', 'number', districtCode]);
-      map.setFilter("CD-Fills", filter);
-      // Could also do CD-Outlines and CD-Labels.
+                  // Grab the URL hash
+                  var hash = window.location.hash;
 
-      // Ease to that district.
-      var bbox = bboxes[stateAbbr + (districtCode ? districtCode : '')];
-      map.easeTo(lngLatBoundsToCameraOptions(mapboxgl.LngLatBounds.convert(bbox)));
-    }
+                  // Split up the hash string into its components
+                  var hashData = hash.substring(1).split('&').map(function(d) { return d.split('=') });
 
-    // Check the URL hash to determine how the map should be focused
-    function checkHash() {
-      // If a URL hash is found...
-      if(window.location.hash) {
+                  // Determine state or district based on the hash data
+                  var state, district;
+                  hashData.map(function(d) {
+                    if (d[0] === 'state') state = d[1];
+                    if (d[0] === 'district') district = d[1];
+                  })
 
-        // Grab the URL hash
-        var hash = window.location.hash;
+                  // If a state or state and district were found in the URL hash, focus the map to this location
+                  if (state || (state && district)) focusMap(state, district);
 
-        // Split up the hash string into its components
-        var hashData = hash.substring(1).split('&').map(function(d) { return d.split('=') });
+                } else {
+                  // If there is no URL hash...
+                  // And if its not the first time the page is loading...
+                  if (!initial) {
 
-        // Determine state or district based on the hash data
-        var state, district;
-        hashData.map(function(d) {
-          if (d[0] === 'state') state = d[1];
-          if (d[0] === 'district') district = d[1];
-        })
+                    // Reset the map style to its original style object and jump back to the continental view
+                    map.jumpTo(continentalView(window.innerWidth/2, window.innerHeight/2));
 
-        // If a state or state and district were found in the URL hash, focus the map to this location
-        if (state || (state && district)) focusMap(state, district);
+                    //** INTERACTIVE MENU
+                    // Empty the list of districts because no state is selected
+                    $('#district').empty();
+                  }
+                }
+              }
 
-      } else {
-        // If there is no URL hash...
-        // And if its not the first time the page is loading...
-        if (!initial) {
+              // When the URL hash changes, call the checkHash function
+              window.onhashchange = checkHash;
 
-          // Reset the map style to its original style object and jump back to the continental view
-          map.jumpTo(continentalView(window.innerWidth/2, window.innerHeight/2));
+              // Record that it initial page load and the hash still needs to be checked
+              var initial = true;
+              checkHash();
 
-          //** INTERACTIVE MENU
-          // Empty the list of districts because no state is selected
-          $('#district').empty();
-        }
-      }
-    }
+              // Record that it is no longer the initial page load
+              initial = false;
 
-    // When the URL hash changes, call the checkHash function
-    window.onhashchange = checkHash;
+              // A click handler that shows what was under the cursor where
+              // the user clicked.
+              map.on("click", function(e) {
+                // The map control provides a client-side-only way to determine what
+                // is under the cursor. But this only sees features that are currently
+                // shown on the map. so if a filter is applied and the click is on
+                // a district that is not shown, then this will miss the feature.
+                var features = map.queryRenderedFeatures(
+                  e.point,
+                  {
+                    layers: ["cdfill"]
+                  });
+                if (features.length > 0) {
+                  show_district(features[0].properties);
+                  return;
+                }
 
-    // Record that it initial page load and the hash still needs to be checked
-    var initial = true;
-    checkHash();
+                if (!map.getFilter("cdfill")) {
+                  // If no filter is applied, then a negative result is definitive.
+                  show_district(null);
+                  return;
+                }
+                
+                // Click was not on a district or outside of the
+                // districts that are not filtered-out.
+                //show_district(null);
 
-    // Record that it is no longer the initial page load
-    initial = false;
+                function show_district(district) {
+                  // Ok now we have the district either from the client-side query or the
+                  // API.
+                  if (district) {
+                    // district.state now holds the two-letter USPS state abbreviation,
+                    // and district.number now holds a zero-padded two-digit district
+                    // number (00 for at-large districts). title_long and title_short
+                    // have strings useful for display (e.g. "VA 8" and "Virginia’s 8th
+                    // Congressional District", respectively).
+                    alert("That's " + district.state + "-" + district.number + ".");
+                    focusMap(district.state, district.number);
 
-    // A click handler that shows what was under the cursor where
-    // the user clicked.
-    map.on("click", function(e) {
-      // The map control provides a client-side-only way to determine what
-      // is under the cursor. But this only sees features that are currently
-      // shown on the map. so if a filter is applied and the click is on
-      // a district that is not shown, then this will miss the feature,
-      // but we'll fall back to the tilequery API in that case.
-      var features = map.queryRenderedFeatures(
-        e.point,
-        {
-          layers: ["CD-Fills"]
-        });
-      if (features.length > 0) {
-        show_district(features[0].properties);
-        return;
-      }
-
-      if (!map.getFilter("CD-Fills")) {
-        // If no filter is applied, then a negative result is definitive.
-        show_district(null);
-        return;
-      }
-      
-      // Fall back to the Mapbox Tilequery API. This is likely to happen
-      // if a filter is applied (which you could test with 
-      // map.getFilter("CD-Fills"), but we might as well see if the click
-      // is on a rendered feature before hitting the API. 
-      //
-      // Note that, from the Mapbox API docs:
-      // "Use of this endpoint is rate limited to 600 requests per minute."
-      $.ajax({
-        url: 'https://api.mapbox.com/v4/' + tilesetId + '/tilequery/' + e.lngLat.lng + ',' + e.lngLat.lat + '.json?radius=0&access_token=' + accessToken,
-        method: 'GET',
-        success: function(resp) {
-          if (resp.type == "FeatureCollection" && resp.features.length > 0)
-            // resp is always a FeatureCollection, just sanity checking, but it might
-            // be empty. If it's not empty, it will contain a single Feature
-            // (whose geometry is a Polygon) represending the boundaries of a
-            // congressional district. Its properties come from the original
-            // GeoJSON uploaded to Mapbox.
-            show_district(resp.features[0].properties);
-          else
-            // Click was not on a district.
-            show_district(null);
-        }
-      });
-
-      function show_district(district) {
-        // Ok now we have the district either from the client-side query or the
-        // API.
-        if (district) {
-          // district.state now holds the two-letter USPS state abbreviation,
-          // and district.number now holds a zero-padded two-digit district
-          // number (00 for at-large districts). title_long and title_short
-          // have strings useful for display (e.g. "VA 8" and "Virginia’s 8th
-          // Congressional District", respectively).
-          alert("That's " + district.state + "-" + district.number + ".");
-          focusMap(district.state, district.number);
-
-        } else {
-          alert("You clicked on a location that is not within a U.S. congressional district.")
-        }
-      }
-    })
-
-  });
-
-
-</script>
-
-</body>
+                  } else {
+                    alert("You clicked on a location that is not within a U.S. congressional district.")
+                  }
+                }
+              })
+            });          
+        </script>
+    </body>
 </html>
