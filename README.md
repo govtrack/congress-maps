@@ -78,3 +78,18 @@ node_modules/http-server/bin/http-server . --cors
 
 and visit http://127.0.0.1:8080/example.
 
+## Query by lat/lng
+
+When a map is loaded, querying the displayed map for what is under the mouse cursor is possible to do client-side (see the example). But it's only as good as the zoom level loaded.
+
+It is possible to query the pmtiles data directly to find a congressional district by longitude/latitude since it basically is a geospatial index.
+
+An example to do that in Python is included:
+
+```
+virtualenv venv
+venv/bin/pip install pmtiles mapbox-vector-tile shapeley
+venv/bin/python query.py data/cd-119-2024.pmtiles 12 -100 40
+```
+
+Note that the first argument is the zoom level to query at. It should be the max zoom level passed to tippecanoe with -z.
