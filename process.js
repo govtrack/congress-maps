@@ -85,49 +85,56 @@ districts.features.forEach(function(feature) {
 // contains both district boundaries and label points.
 var mapData = { 'type': 'FeatureCollection', 'features': [] }
 districts.features.forEach(function(d) {
+  // Add a type property to distinguish between labels and boundaries
+  d.properties.group = 'boundary';
+  mapData.features.push(d);
+
   // Compute a good location to place a label for this district.
-  // If the district has multiple parts, use the largest part.
-  // polylabel doesn't work with a MultiPolygon and also putting
-  // the label in the largest part probably will look best.
-  let d_label = d;
-  if (d_label.geometry.type == "MultiPolygon") {
-    // Split the MultiPolygon into Polygon features and use
-    // turf.area to compute each's area. Find the one with
-    // the largest area.
-    d_label = null;
+  // If the district has multiple parts, like some islands, put
+  // a label in each part otherwise there's no way to know what
+  // district the part is. Also polylabel doesn't work with a
+  // MultiPolygon.
+
+  function addLabel(feature)
+  {
+    var label_coord = polylabel(feature.geometry.coordinates, 0.000001);
+    if (Number.isNaN(label_coord[0]))
+      throw d.properties.title_long;
+
+    // Create a turf.point to hold information for rending labels.
+    var pt = turf.point(label_coord);
+
+    // copy district metadata to the label
+    pt.properties = JSON.parse(JSON.stringify(feature.properties)); // copy hack to avoid mutability issues
+
+    pt.properties.group = 'label';
+
+    // add the area to the point to control zoom level steps for label styling
+    pt.properties.area = turf.area(feature);
+
+    // add both the label point and congressional district to the mapData feature collection
+    mapData.features.push(pt);
+  }
+
+  if (d.geometry.type == "MultiPolygon")
+  {
+    // Split the MultiPolygon into Polygon features.
     d.geometry.coordinates.forEach(geom => {
       let polygon = {
         type: 'Feature',
         geometry: {
           type: 'Polygon',
           coordinates: geom
-        }
+        },
+        properties: d.properties
       };
-      polygon.area = turf.area(polygon);
-      if (d_label === null || polygon.area > d_label.area)
-        d_label = polygon;
+      addLabel(polygon);
     });
-  };
-  var label_coord = polylabel(d_label.geometry.coordinates, 1);
-  if (Number.isNaN(label_coord[0]))
-    throw d.properties.title_long;
-
-  // Create a turf.point to hold information for rending labels.
-  var pt = turf.point(label_coord);
-
-  // copy district metadata to the label
-  pt.properties = JSON.parse(JSON.stringify(d.properties)); // copy hack to avoid mutability issues
-
-  // add a type property to distinguish between labels and boundaries
-  pt.properties.group = 'label';
-  d.properties.group = 'boundary';
-
-  // add the area to the point to control zoom level steps for label styling
-  pt.properties.area = turf.area(d);
-
-  // add both the label point and congressional district to the mapData feature collection
-  mapData.features.push(pt);
-  mapData.features.push(d);
+  }
+  else if (d.geometry.type == "Polygon")
+  {
+    addLabel(d);
+  }
 });
 
 // Write out the mapData. It's too large to use JSON.stringify with indentation,
