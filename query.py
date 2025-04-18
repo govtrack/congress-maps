@@ -41,7 +41,7 @@ class PmtilesLookup:
         import math
         x = math.modf((lon+180)/360*math.pow(2,zoom))
         y = math.modf((1-math.log(math.tan(lat*math.pi/180) + 1/math.cos(lat*math.pi/180))/math.pi)/2 *math.pow(2,zoom))
-        return ((int(x[1]), x[0]), (int(y[1]), y[0]))
+        return ((int(x[1]), x[0]), (int(y[1]), 1 - y[0]))
 
     def get_tile(self, lng, lat):
         (x, tilex), (y, tiley) = self.lnglat_to_tile(self.zoomlevel, lng, lat)
@@ -52,18 +52,28 @@ class PmtilesLookup:
         return (features, tilex, tiley)
 
     def intersect_features(self, features, tilex, tiley):
+        if not 'layer' in features: return
         layer = features['layer']
         extent = layer['extent']
+        if not 'features' in layer: return
         for feature in layer['features']:
             geometry = feature['geometry']
-            if geometry['type'] != 'Polygon':
+            #print(geometry['type'], feature['properties']['title_short'])
+            if geometry['type'] == 'Polygon':
+                geometry = [geometry['coordinates']]
+            elif geometry['type'] == 'MultiPolygon':
+                geometry = geometry['coordinates']
+            else:
                 continue
-            poly = geometry['coordinates']
-            poly = [
-                [(ptx / extent, pty / extent) for (ptx, pty) in ring]
-                for ring in poly]
-            if shapely.Polygon(poly[0], poly[1:]).contains(shapely.Point((tilex, tiley))):
-                yield feature
+            geometry = [
+                [ [(ptx / extent, pty / extent) for (ptx, pty) in ring]
+                 for ring in poly ]
+                for poly in geometry ]
+            for poly in geometry:
+                if shapely.Polygon(poly[0], poly[1:]).contains(shapely.Point((tilex, tiley))):
+                    #print("", "matched")
+                    yield feature
+                    break # no need to match other polygons within this MultiPolygon
 
     def __call__(self, lng, lat):
         (features, tilex, tiley) = self.get_tile(lng, lat)
