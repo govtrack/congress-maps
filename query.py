@@ -41,14 +41,14 @@ class PmtilesLookup:
         import math
         x = math.modf((lon+180)/360*math.pow(2,zoom))
         y = math.modf((1-math.log(math.tan(lat*math.pi/180) + 1/math.cos(lat*math.pi/180))/math.pi)/2 *math.pow(2,zoom))
-        return ((int(x[1]), x[0]), (int(y[1]), 1 - y[0]))
+        return ((int(x[1]), x[0]), (int(y[1]), y[0]))
 
     def get_tile(self, lng, lat):
         (x, tilex), (y, tiley) = self.lnglat_to_tile(self.zoomlevel, lng, lat)
         tile = self.reader.get(self.zoomlevel, x, y)
         if self.header["tile_compression"] == Compression.GZIP:
             tile = gzip.decompress(tile)
-        features = mapbox_vector_tile.decode(tile)
+        features = mapbox_vector_tile.decode(tile, default_options={ "y_coord_down": True })
         return (features, tilex, tiley)
 
     def intersect_features(self, features, tilex, tiley):
